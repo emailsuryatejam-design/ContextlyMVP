@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Business Card Scanner</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 480px;
+    padding: 24px;
+  }
+
+  h1 {
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  /* Preview area */
+  .preview-area {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/10;
+    background: #0f172a;
+    border: 2px dashed #334155;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin-bottom: 20px;
+    transition: border-color 0.2s;
+  }
+
+  .preview-area.has-image { border-style: solid; border-color: #3b82f6; }
+  .preview-area.dragover { border-color: #3b82f6; background: #1e3a5f; }
+
+  .preview-placeholder { text-align: center; color: #64748b; }
+  .preview-placeholder svg { width: 48px; height: 48px; margin-bottom: 8px; opacity: 0.5; }
+  .preview-placeholder p { font-size: 14px; }
+
+  #previewImg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: none;
+  }
+
+  .preview-area.has-image #previewImg { display: block; }
+  .preview-area.has-image .preview-placeholder { display: none; }
+
+  .clear-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.6);
+    border: none;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .has-image .clear-btn { display: flex; }
+
+  /* Camera view */
+  .camera-view {
+    display: none;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/10;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .camera-view video { width: 100%; height: 100%; object-fit: cover; }
+
+  .camera-controls {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .camera-controls button {
+    padding: 10px 24px;
+    border-radius: 24px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .snap-btn { background: #3b82f6; color: white; }
+  .cancel-cam-btn { background: rgba(255,255,255,0.15); color: white; }
+
+  /* Action buttons */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid #334155;
+    background: #0f172a;
+    color: #e2e8f0;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .action-btn:hover { background: #1e3a5f; border-color: #3b82f6; }
+  .action-btn svg { width: 20px; height: 20px; }
+
+  /* Submit */
+  .submit-btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: 12px;
+    border: none;
+    background: #3b82f6;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .submit-btn:hover:not(:disabled) { background: #2563eb; }
+  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Status */
+  .status { text-align: center; margin-top: 16px; font-size: 14px; min-height: 20px; }
+  .status.success { color: #4ade80; }
+  .status.error { color: #f87171; }
+  .status.loading { color: #facc15; }
+
+  .spinner {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #fileInput { display: none; }
+  canvas { display: none; }
+
+  /* Result card */
+  .result-card {
+    margin-top: 20px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 20px;
+    display: none;
+  }
+
+  .result-card.show { display: block; }
+
+  .result-card h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    color: #3b82f6;
+  }
+
+  .result-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #1e293b;
+    font-size: 13px;
+  }
+
+  .result-row:last-child { border-bottom: none; }
+  .result-label { color: #94a3b8; text-transform: capitalize; }
+  .result-value { color: #e2e8f0; text-align: right; max-width: 60%; word-break: break-all; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Business Card Scanner</h1>
+  <p class="subtitle">Capture or upload a business card to process</p>
+
+  <div class="card">
+    <!-- Preview -->
+    <div class="preview-area" id="previewArea">
+      <div class="preview-placeholder" id="placeholder">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"/>
+        </svg>
+        <p>Drop a business card image here</p>
+      </div>
+      <img id="previewImg" alt="Business card preview">
+      <button class="clear-btn" id="clearBtn" title="Remove image">&times;</button>
+    </div>
+
+    <!-- Camera -->
+    <div class="camera-view" id="cameraView">
+      <video id="video" autoplay playsinline></video>
+      <div class="camera-controls">
+        <button class="cancel-cam-btn" id="cancelCamBtn">Cancel</button>
+        <button class="snap-btn" id="snapBtn">Capture</button>
+      </div>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <!-- Buttons -->
+    <div class="actions">
+      <button class="action-btn" id="cameraBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/>
+        </svg>
+        Camera
+      </button>
+      <button class="action-btn" id="uploadBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+        </svg>
+        Upload
+      </button>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*">
+
+    <button class="submit-btn" id="submitBtn" disabled>
+      Send to n8n
+    </button>
+
+    <div class="status" id="status"></div>
+
+    <!-- Extracted data result -->
+    <div class="result-card" id="resultCard">
+      <h3>Extracted Contact</h3>
+      <div id="resultBody"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var WEBHOOK_URL = '<?php echo "https://spanishtiles.app.n8n.cloud/webhook/ddfe6237-0501-4017-b53c-6b90cfbf3d73"; ?>';
+
+var previewArea = document.getElementById('previewArea');
+var previewImg = document.getElementById('previewImg');
+var placeholder = document.getElementById('placeholder');
+var clearBtn = document.getElementById('clearBtn');
+var cameraBtn = document.getElementById('cameraBtn');
+var uploadBtn = document.getElementById('uploadBtn');
+var fileInput = document.getElementById('fileInput');
+var submitBtn = document.getElementById('submitBtn');
+var statusEl = document.getElementById('status');
+var cameraView = document.getElementById('cameraView');
+var video = document.getElementById('video');
+var canvas = document.getElementById('canvas');
+var snapBtn = document.getElementById('snapBtn');
+var cancelCamBtn = document.getElementById('cancelCamBtn');
+var resultCard = document.getElementById('resultCard');
+var resultBody = document.getElementById('resultBody');
+
+var currentFile = null;
+var stream = null;
+
+// --- File Upload ---
+uploadBtn.addEventListener('click', function() { fileInput.click(); });
+
+fileInput.addEventListener('change', function(e) {
+  if (e.target.files.length > 0) setImage(e.target.files[0]);
+});
+
+// --- Drag & Drop ---
+previewArea.addEventListener('dragover', function(e) {
+  e.preventDefault();
+  previewArea.classList.add('dragover');
+});
+
+previewArea.addEventListener('dragleave', function() {
+  previewArea.classList.remove('dragover');
+});
+
+previewArea.addEventListener('drop', function(e) {
+  e.preventDefault();
+  previewArea.classList.remove('dragover');
+  if (e.dataTransfer.files.length > 0) setImage(e.dataTransfer.files[0]);
+});
+
+// --- Camera ---
+cameraBtn.addEventListener('click', function() {
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+  }).then(function(s) {
+    stream = s;
+    video.srcObject = stream;
+    cameraView.style.display = 'block';
+    previewArea.style.display = 'none';
+  }).catch(function() {
+    setStatus('Camera access denied or unavailable.', 'error');
+  });
+});
+
+snapBtn.addEventListener('click', function() {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(function(blob) {
+    var file = new File([blob], 'business-card.jpg', { type: 'image/jpeg' });
+    setImage(file);
+    stopCamera();
+  }, 'image/jpeg', 0.92);
+});
+
+cancelCamBtn.addEventListener('click', stopCamera);
+
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(function(t) { t.stop(); });
+    stream = null;
+  }
+  cameraView.style.display = 'none';
+  previewArea.style.display = 'flex';
+}
+
+// --- Image handling ---
+function setImage(file) {
+  if (!file.type.startsWith('image/')) {
+    setStatus('Please select an image file.', 'error');
+    return;
+  }
+  currentFile = file;
+  previewImg.src = URL.createObjectURL(file);
+  previewArea.classList.add('has-image');
+  submitBtn.disabled = false;
+  resultCard.classList.remove('show');
+  setStatus('');
+}
+
+clearBtn.addEventListener('click', function() {
+  currentFile = null;
+  previewImg.src = '';
+  previewArea.classList.remove('has-image');
+  submitBtn.disabled = true;
+  fileInput.value = '';
+  resultCard.classList.remove('show');
+  setStatus('');
+});
+
+// --- Submit to n8n ---
+submitBtn.addEventListener('click', function() {
+  if (!currentFile) return;
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner"></span> Sending...';
+  setStatus('Uploading to n8n...', 'loading');
+  resultCard.classList.remove('show');
+
+  var formData = new FormData();
+  formData.append('image', currentFile, currentFile.name);
+
+  fetch(WEBHOOK_URL, {
+    method: 'POST',
+    body: formData
+  }).then(function(res) {
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    return res.json();
+  }).then(function(data) {
+    setStatus('Business card processed successfully!', 'success');
+    showResult(data);
+  }).catch(function(err) {
+    setStatus('Error: ' + err.message, 'error');
+  }).finally(function() {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = 'Send to n8n';
+  });
+});
+
+function showResult(data) {
+  var contactData = data.data || data;
+  var html = '';
+  var fields = ['name', 'job_title', 'company', 'email', 'phone', 'mobile', 'website', 'address', 'city', 'country', 'linkedin'];
+
+  for (var i = 0; i < fields.length; i++) {
+    var key = fields[i];
+    var val = contactData[key];
+    if (val && val !== 'null' && val !== null) {
+      var label = key.replace(/_/g, ' ');
+      html += '<div class="result-row"><span class="result-label">' + label + '</span><span class="result-value">' + escapeHtml(val) + '</span></div>';
+    }
+  }
+
+  if (html) {
+    resultBody.innerHTML = html;
+    resultCard.classList.add('show');
+  }
+}
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function setStatus(msg, type) {
+  statusEl.textContent = msg;
+  statusEl.className = 'status ' + (type || '');
+}
+</script>
+
+</body>
+</html>

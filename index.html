@@ -346,13 +346,11 @@ previewArea.addEventListener('drop', function(e) {
 
 // --- Camera ---
 cameraBtn.addEventListener('click', function() {
-  // Force landscape constraints so mobile doesn't rotate to portrait
   navigator.mediaDevices.getUserMedia({
     video: {
       facingMode: 'environment',
-      width: { ideal: 1920, min: 1280 },
-      height: { ideal: 1080, min: 720 },
-      aspectRatio: { ideal: 16/9 }
+      width: { ideal: 1920 },
+      height: { ideal: 1080 }
     }
   }).then(function(s) {
     stream = s;
@@ -365,22 +363,10 @@ cameraBtn.addEventListener('click', function() {
 });
 
 snapBtn.addEventListener('click', function() {
-  var vw = video.videoWidth;
-  var vh = video.videoHeight;
-
-  // If portrait (taller than wide), rotate to landscape
-  if (vh > vw) {
-    canvas.width = vh;
-    canvas.height = vw;
-    var ctx = canvas.getContext('2d');
-    ctx.translate(vh / 2, vw / 2);
-    ctx.rotate(Math.PI / 2);
-    ctx.drawImage(video, -vw / 2, -vh / 2);
-  } else {
-    canvas.width = vw;
-    canvas.height = vh;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-  }
+  // Capture exactly what the video shows - no rotation
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
 
   canvas.toBlob(function(blob) {
     var file = new File([blob], 'business-card.jpg', { type: 'image/jpeg' });
